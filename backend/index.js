@@ -9,7 +9,7 @@ const { log } = require("console");
 const jwt = require("jsonwebtoken");
 
 // Encoding the password to handle special characters
-const password = encodeURIComponent("Hois@2024");
+const password = encodeURIComponent('mR5PCoyNAaNpjPvE');
 const uri = `mongodb+srv://hosnyish:${password}@cluster0.ebp3r.mongodb.net/e-commerce`;
 
 app.use(express.json());
@@ -17,10 +17,7 @@ app.use(cors());
 
 // Database connection with mongoose
 mongoose
-  .connect(uri, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-  })
+  .connect(uri)
   .then(() => console.log("Connected to MongoDB"))
   .catch((error) => console.error("MongoDB connection error:", error));
 
@@ -170,6 +167,9 @@ const Users = mongoose.model('Users',{
      unique: true,
 
   },
+
+
+
   password:{
     type: String,
 
@@ -194,7 +194,7 @@ app.post('/signup',async(req,res)=>{
   }
   let cart={}
   for(let i=0 ; i<300;i++){
-    cart[0]=0;
+    cart[i]=0;
   }
 
   const user =new Users({
@@ -212,7 +212,7 @@ const data ={
 }
 
 const token = jwt.sign(data,'secret_ecom')
-res.json({success:true,token})
+res.json({success:true,token,username:req.body.username,email:req.body.email})
 
 
 })
@@ -231,7 +231,7 @@ app.post('/login',async(req,res)=>{
 
       const token = jwt.sign(data,'secret_ecom');
 
-    res.json({success:true,token})
+    res.json({success:true,token,username:req.body.username,email:req.body.email})
 
     }else{
       res.json({success:false,error:"Password is incorrect"})
@@ -245,6 +245,61 @@ app.post('/login',async(req,res)=>{
 
 
 
+
+
+//creating middleware for fetch user
+const fetchUser=async(req,res,next)=>{
+const token = req.header('auth-token'); 
+
+  if(!token){
+    
+    res.status(401).send({error:"please authenticate useing valid token-"})
+    
+  }else{
+    try{
+      const data=jwt.verify(token,'secret_ecom');
+      req.user=data.user;
+      console.log("inside");   
+      next();
+    }catch(e){
+      res.status(401).send({error:"please authenticate useing valid token--"})
+    }
+  }
+
+
+}
+// endpoint adding product to cart
+app.post('/addtocart',fetchUser, async (req, res) => {
+  console.log("Added",req.body.itemId);
+  let userData=await Users.findOne({_id:req.user.id})
+   userData.cartData[req.body.itemId]+=1;
+   await Users.findByIdAndUpdate({_id:req.user.id},{cartData:userData.cartData})
+   res.send("added")
+})
+
+//endpoint removing product from cart
+
+app.post('/removefromcart',fetchUser,async(req,res)=>{
+  console.log("removed",req.body.itemId);
+  let userData=await Users.findOne({_id:req.user.id})
+  if(userData.cartData[req.body.itemId]>0)
+  userData.cartData[req.body.itemId]-=1;
+  await Users.findByIdAndUpdate({_id:req.user.id},{cartData:userData.cartData})
+  res.send("removed")
+})
+
+//endpoint get cartitem 
+app.post("/getcart",fetchUser,async(req,res)=>{
+  let userData = await Users.findOne({_id:req.user.id});
+  res.json(userData.cartData);
+})
+
+//endpint get user info 
+app.post("/getuserinfo",fetchUser,async(req,res)=>{
+  let userData = await Users.findOne({_id:req.user.id});
+  res.json(userData.name);
+})
+
 app.listen(port, (error) => {
   if (!error) {
     console.log("Server running on port " + port);
@@ -252,27 +307,3 @@ app.listen(port, (error) => {
     console.log("Error: " + error);
   }
 });
-
-//creating middleware for fetch user
-const fetchUser=async(req,res,next)=>{
-  const token = req.header('auth-token');
-  if(!token){
-    res.status(401).send({error:"please authenticate useing valid token"})
-    
-  }else{
-    try{
-      const data=jwt.verify(token,"secret_ecom");
-      req.user=data.user;
-      next();
-    }catch(e){
-      res.status(401).send({error:"please authenticate useing valid token"})
-    }
-  }
-
-
-}
-// endpoint adding product to cart
-app.post('/addtocart',fetchUser, (req, res) => {
-  console.log(req.body,req.user);
-
-})
